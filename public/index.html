@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ledger — Paper Trading Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="tape" aria-hidden="true">
+    <div class="tape-track" id="tapeTrack">Loading live prices…</div>
+  </div>
+
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="brand">
+        <span class="brand-mark">§</span>
+        <div class="brand-text">
+          <h1>Ledger</h1>
+          <p>A paper‑trading terminal — practice money, real market prices</p>
+        </div>
+      </div>
+      <div id="userBar" class="user-bar hidden">
+        <div class="user-bar-value">
+          <span class="label">Portfolio value</span>
+          <span class="amount" id="headerTotalValue">$0.00</span>
+        </div>
+        <span class="user-name" id="headerUsername"></span>
+        <button class="ghost-btn" id="logoutBtn">Sign out</button>
+      </div>
+    </div>
+    <nav class="tabs hidden" id="tabNav">
+      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="trade">Trade</button>
+      <button class="tab-btn" data-tab="history">Ledger&nbsp;history</button>
+    </nav>
+  </header>
+
+  <main id="app">
+
+    <!-- AUTH VIEW -->
+    <section id="authView" class="auth-view">
+      <div class="auth-card">
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-auth="login">Sign in</button>
+          <button class="auth-tab" data-auth="register">Open an account</button>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+          <label>Username
+            <input type="text" name="username" required autocomplete="username" />
+          </label>
+          <label>Password
+            <input type="password" name="password" required autocomplete="current-password" />
+          </label>
+          <button type="submit" class="primary-btn">Sign in</button>
+          <p class="form-error" id="loginError"></p>
+        </form>
+
+        <form id="registerForm" class="auth-form hidden">
+          <label>Choose a username
+            <input type="text" name="username" required autocomplete="username" />
+          </label>
+          <label>Choose a password
+            <input type="password" name="password" required minlength="6" autocomplete="new-password" />
+            <span class="hint">6 characters minimum</span>
+          </label>
+          <button type="submit" class="primary-btn">Open account — starts with $10,000</button>
+          <p class="form-error" id="registerError"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- DASHBOARD VIEW -->
+    <section id="dashboardView" class="view hidden">
+      <div class="summary-row">
+        <div class="summary-card">
+          <span class="summary-label">Cash on hand</span>
+          <span class="summary-value" id="cashBalance">$0.00</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Holdings value</span>
+          <span class="summary-value" id="holdingsValue">$0.00</span>
+        </div>
+        <div class="summary-card highlight">
+          <span class="summary-label">Total portfolio</span>
+          <span class="summary-value" id="totalValue">$0.00</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Positions</h2>
+        </div>
+        <table class="ledger-table" id="holdingsTable">
+          <thead>
+            <tr><th>Asset</th><th>Quantity</th><th>Price</th><th>24h</th><th>Market value</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p class="empty-note hidden" id="holdingsEmpty">No open positions yet. Head to the Trade tab to place your first order.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Price chart — <span id="chartAssetLabel">Bitcoin</span> · 7 days</h2>
+          <select id="chartAssetSelect" class="asset-select"></select>
+        </div>
+        <c
