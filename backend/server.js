@@ -9,7 +9,8 @@
 //   POST /api/trade              (auth)  { symbol, side, quantity }
 //   GET  /api/history            (auth)                   past trades
 //
-// Real market data comes from CoinGecko's free public API — no key required.
+// Real market data comes from CoinCap's free public API — no key required,
+// and much more tolerant of shared-hosting IPs than CoinGecko's free tier.
 
 const express = require('express');
 const cors = require('cors');
@@ -28,6 +29,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ---- Supported assets --------------------------------------------------
+// CoinCap asset ids (lowercase slugs)
 const ASSETS = {
   BTC: { id: 'bitcoin', name: 'Bitcoin' },
   ETH: { id: 'ethereum', name: 'Ethereum' },
@@ -35,13 +37,10 @@ const ASSETS = {
   ADA: { id: 'cardano', name: 'Cardano' },
   DOGE: { id: 'dogecoin', name: 'Dogecoin' },
 };
-const COINGECKO_IDS = Object.values(ASSETS).map(a => a.id).join(',');
+const ASSET_IDS = Object.values(ASSETS).map(a => a.id);
 
-// In-memory price cache. If CoinGecko rate-limits us (common on shared
-// hosting IPs like Render's free tier), we fall back to the last good
-// prices instead of failing the whole request.
 let priceCache = { data: null, fetchedAt: 0 };
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 30_000;
 
 async function getLivePrices() {
   const now = Date.now();
@@ -49,7 +48,7 @@ async function getLivePrices() {
     return priceCache.data;
   }
 
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${COINGECKO_IDS}&vs_currencies=usd&include_24hr_change=true`;
+  const url = `https://api.coincap.io/v2/assets?ids=${ASSET_IDS.join(',')}`;
 
   let res;
   try {
@@ -60,25 +59,26 @@ async function getLivePrices() {
   }
 
   if (!res.ok) {
-    if (priceCache.data) return priceCache.data; // rate-limited — serve stale cache
-    throw new Error(`CoinGecko error: ${res.status}`);
+    if (priceCache.data) return priceCache.data;
+    throw new Error(`CoinCap error: ${res.status}`);
   }
 
-  const raw = await res.json();
+  const json = await res.json();
+  const rows = json.data || [];
   const bySymbol = {};
   for (const [symbol, meta] of Object.entries(ASSETS)) {
-    const entry = raw[meta.id];
-    if (!entry) continue;
+    const row = rows.find(r => r.id === meta.id);
+    if (!row) continue;
     bySymbol[symbol] = {
       symbol,
       name: meta.name,
-      price: entry.usd,
-      change24h: entry.usd_24h_change ?? 0,
+      price: parseFloat(row.priceUsd),
+      change24h: parseFloat(row.changePercent24Hr) || 0,
     };
   }
 
   if (Object.keys(bySymbol).length === 0 && priceCache.data) {
-    return priceCache.data; // malformed/empty response — keep serving stale cache
+    return priceCache.data;
   }
 
   priceCache = { data: bySymbol, fetchedAt: now };
@@ -144,14 +144,14 @@ app.get('/api/market/history/:symbol', async (req, res) => {
   const asset = ASSETS[symbol];
   if (!asset) return res.status(404).json({ error: 'Unknown symbol' });
   try {
-    const url = `https://api.coingecko.com/api/v3/coins/${asset.id}/market_chart?vs_currency=usd&days=7`;
+    const end = Date.now();
+    const start = end - 7 * 24 * 60 * 60 * 1000;
+    const url = `https://api.coincap.io/v2/assets/${asset.id}/history?interval=h6&start=${start}&end=${end}`;
     const r = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!r.ok) throw new Error(`CoinGecko error: ${r.status}`);
+    if (!r.ok) throw new Error(`CoinCap error: ${r.status}`);
     const json = await r.json();
-    const prices = json.prices || [];
-    const step = Math.max(1, Math.floor(prices.length / 40));
-    const sampled = prices.filter((_, i) => i % step === 0).map(([t, p]) => ({ t, p }));
-    res.json(sampled);
+    const points = (json.data || []).map(pt => ({ t: pt.time, p: parseFloat(pt.priceUsd) }));
+    res.json(points);
   } catch (err) {
     res.status(502).json({ error: 'Could not fetch price history', detail: err.message });
   }
